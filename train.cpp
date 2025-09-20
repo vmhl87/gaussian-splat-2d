@@ -1,7 +1,7 @@
 const int TIMELAPSE = 1;
 const int DEFAULT_SPLATS = 512;
 
-float RATE = 0.1;
+float RATE = 0.05;
 
 #include <iostream>
 #include <random>
@@ -26,6 +26,29 @@ inline float rng(){
 	return uniform(gen);
 }
 
+struct hist{
+	float sum = 0.0;
+	int count = 0, range;
+
+	hist(int r){
+		range = r;
+	}
+
+	void tick(float v){
+		sum += v;
+		++count;
+
+		if(count == range)
+			sum /= 2, count /= 2;
+	}
+
+	float avg(){
+		return count ? sum/count : 0;
+	}
+};
+
+hist hist1(2000), hist2(1000);
+
 #include "splat.cpp"
 
 unsigned char *data;
@@ -41,15 +64,13 @@ double loss(){
 	return (double) ret/ width / height / 3.0;
 }
 
-double avg_rate = 0.0, avg_count = 0.0;
-
 int main(){
 	srand(time(NULL));
 
 	int E = read_splats("scene.conf");
 
 	read_bmp("reference.bmp", &data, &width, &height);
-	int diag = std::sqrt(width*width + height*height);
+	float diag = std::sqrt(width*width + height*height);
 	data2 = new unsigned char[width*height*3];
 	canvas = new float[width*height*3];
 	
@@ -73,7 +94,7 @@ int main(){
 
 	signal(SIGINT, sighandler);
 
-	float a1 = 0, a2 = 0; bool y = 1; while(true){
+	float a1 = 0, a2 = 0; int y = 1, count = 0; while(true){
 		if(signal_status == SIGINT){
 			std::cout << "\nterminated";
 			break;
@@ -86,8 +107,10 @@ int main(){
 
 		_splat o1 = splat[i], o2 = splat[j];
 
-		auto M = [] (float &d, float m) {
-			d = std::max(0.0, std::min(1.0, d/m + (rng()*2.0-1.0)*RATE)) * m;
+		float R = rng();
+
+		auto M = [R] (float &d, float m) {
+			d = std::max(0.0, std::min(1.0, d/m + (R*2.0-1.0)*RATE)) * m;
 		};
 
 		int C = rand()%9;
@@ -95,13 +118,15 @@ int main(){
 		if(C == 0) M(splat[i].x, width);
 		if(C == 1) M(splat[i].y, height);
 
-		if(C == 2) M(splat[i].r[0], diag/16);
-		if(C == 3) M(splat[i].r[1], diag/16);
+		if(C == 2) splat[i].r[0] = std::max(0.5, std::min(
+			diag/16.0, splat[i].r[0] + (R*2.0-1.0)*RATE*16/diag));
+		if(C == 3) splat[i].r[1] = std::max(0.5, std::min(
+			diag/16.0, splat[i].r[1] + (R*2.0-1.0)*RATE*16/diag));
 
 		for(int z=0; z<4; ++z) if(C == 4+z) M(splat[i].c[z], 1.0);
 
 		if(C == 8){
-			splat[i].r[4] = std::fmod(splat[i].r[4]/M_PI/2.0 + (rng()*2.0-1.0)*RATE, 1.0)*M_PI*2.0;
+			splat[i].r[4] = std::fmod(splat[i].r[4]/M_PI/2.0 + (R*2.0-1.0)*RATE, 1.0)*M_PI*2.0;
 			splat[i].r[2] = std::cos(splat[i].r[4]);
 			splat[i].r[3] = std::sin(splat[i].r[4]);
 		}
@@ -112,8 +137,8 @@ int main(){
 		double new_error = loss();
 
 		bool reject = 0;
-		if(new_error > error) splat[i] = o1, splat[j] = o2, reject = 1;
-		else avg_rate += error-new_error, error = new_error;
+		if(new_error > error) splat[i] = o1, splat[j] = o2, reject = 1, hist1.tick(0);
+		else hist1.tick(error-new_error), hist2.tick(R), error = new_error;
 
 		auto now = std::chrono::high_resolution_clock::now();
 		float duration = ((std::chrono::duration<float>) (now - start)).count();
@@ -121,7 +146,7 @@ int main(){
 
 		if(a1 > 0.2){
 			std::cout << '\r' << iter/1000 << "K  " << error << "E  " << (int) std::floor(duration*1000) << "T  ";
-			std::cout << avg_rate/(++avg_count) << "A  " << RATE << "R  ";
+			std::cout << hist1.avg() << "A  " << hist2.avg() << "V  " << RATE << "R  ";
 			std::flush(std::cout);
 			a1 = 0;
 		}
@@ -142,8 +167,6 @@ int main(){
 				v.close();
 			};
 		}
-
-		if(iter%5000 == 0) avg_rate = 0, avg_count = 0;
 
 		if(a2 > 1) y = 1, a2 = 0;
 		if(!reject && y) write("progress.bmp"), y = 0;

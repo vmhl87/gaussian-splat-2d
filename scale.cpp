@@ -9,7 +9,7 @@
 #include "splat.cpp"
 
 int main(int argc, const char **argv){
-	if(argc != 4){
+	if(argc < 4){
 		std::cerr << "Incorrect usage:\n";
 		std::cerr << argv[0] << " <config.loc> <output.loc> <scale>\n";
 		return 0;
@@ -18,6 +18,16 @@ int main(int argc, const char **argv){
 	int scale = std::stoi(argv[3]);
 
 	read_splats(argv[1]);
+
+	/*
+	if(argc >= 5){
+		float S = std::stoi(argv[4])/1e2;
+		for(int i=0; i<n; ++i){
+			splat[i].r[0] *= S;
+			splat[i].r[1] *= S;
+		}
+	}
+	*/
 
 	width *= scale, height *= scale;
 	data2 = new unsigned char[width*height*3];
