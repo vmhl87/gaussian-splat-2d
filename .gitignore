@@ -1,0 +1,6 @@
+run
+frames/
+progress.bmp
+reference-crop.bmp
+prep-reference-image/*.bmp
+prep-reference-image/*.jpg
