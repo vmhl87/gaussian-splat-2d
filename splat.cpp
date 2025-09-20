@@ -1,4 +1,4 @@
-const int VERSION = 2;
+const int VERSION = 3;
 
 #include <sstream>
 #include <fstream>
@@ -97,10 +97,24 @@ int read_splats(const char *filename){
 
 	F >> iter;
 
+	char ch; F.get(ch);
+
+	auto in = [&F] (float &f) {
+		float ret;
+		unsigned char *d = (unsigned char*) &ret;
+		for(int i=0; i<sizeof(float); ++i){
+			char ch; F.get(ch);
+			d[i] = ch;
+		}
+		f = ret;
+	};
+
 	for(int i=0; i<n; ++i){
-		F >> splat[i].x >> splat[i].y;
-		for(int j=0; j<5; ++j) F >> splat[i].r[j];
-		for(int j=0; j<4; ++j) F >> splat[i].c[j];
+		in(splat[i].x), in(splat[i].y);
+		in(splat[i].r[0]), in(splat[i].r[1]), in(splat[i].r[4]);
+		splat[i].r[2] = std::cos(splat[i].r[4]);
+		splat[i].r[3] = std::sin(splat[i].r[4]);
+		for(int j=0; j<4; ++j) in(splat[i].c[j]);
 	}
 
     F.close();
@@ -119,10 +133,15 @@ void write_splats(const char *filename){
 	
 	F << iter << '\n';
 
+	auto out = [&F] (float f){
+		unsigned char *d = (unsigned char*) &f;
+		for(int i=0; i<sizeof(float); ++i) F << d[i];
+	};
+
 	for(int i=0; i<n; ++i){
-		F << splat[i].x << ' ' << splat[i].y << ' ';
-		for(int j=0; j<5; ++j) F << splat[i].r[j] << ' ';
-		for(int j=0; j<4; ++j) F << splat[i].c[j] << " \n"[j==3];
+		out(splat[i].x), out(splat[i].y);
+		out(splat[i].r[0]), out(splat[i].r[1]), out(splat[i].r[4]);
+		for(int j=0; j<4; ++j) out(splat[i].c[j]);
 	}
 
     F.close();

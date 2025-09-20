@@ -1,7 +1,7 @@
 const int TIMELAPSE = 1;
-const int DEFAULT_SPLATS = 512;
+const int DEFAULT_SPLATS = 1024;
 
-float RATE = 0.05;
+float RATE = 0.5;
 
 #include <iostream>
 #include <random>
