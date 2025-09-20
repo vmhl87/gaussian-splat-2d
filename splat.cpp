@@ -19,16 +19,17 @@ double *canvas;
 void _paint(int xmin, int ymin, int xmax, int ymax){
 	for(int i=0; i<n; ++i){
 
-		double R = std::max(splat[i].r[0], splat[i].r[1]);
+		auto SP = [] (double a, double b) { return std::sqrt(a*a+b*b); };
+		double xr = SP(splat[i].r[0]*splat[i].r[2], splat[i].r[1]*splat[i].r[3]),
+			   yr = SP(splat[i].r[0]*splat[i].r[3], splat[i].r[1]*splat[i].r[2]);
 
-		int Xmin = std::max(xmin,
-				(int) std::floor(splat[i].x-R*3.0)),
-			Xmax = std::min(xmax,
-				(int) std::ceil(splat[i].x+R*3.0)),
-			Ymin = std::max(ymin,
-				(int) std::floor(splat[i].y-R*3.0)),
-			Ymax = std::min(ymax,
-				(int) std::ceil(splat[i].y+R*3.0));
+		xr *= 2.2;
+		yr *= 2.2;
+
+		int Xmin = std::max(xmin, (int) std::floor(splat[i].x-xr)),
+			Xmax = std::min(xmax, (int) std::ceil(splat[i].x+xr)),
+			Ymin = std::max(ymin, (int) std::floor(splat[i].y-yr)),
+			Ymax = std::min(ymax, (int) std::ceil(splat[i].y+yr));
 
 		for(int y=Ymin; y<Ymax; ++y){
 			for(int x=Xmin; x<Xmax; ++x){

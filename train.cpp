@@ -1,6 +1,7 @@
 const int TIMELAPSE = 1;
 const int DEFAULT_SPLATS = 512;
-const double RATE = 0.1;
+const double RATE = 0.015;
+const double AVG_FALLOFF = 0.999;
 
 #include <iostream>
 #include <random>
@@ -40,6 +41,8 @@ double loss(){
 	return (double) ret/ width / height / 3.0;
 }
 
+double avg_rate = 0.0;
+
 int main(){
 	int E = read_splats("scene.conf");
 
@@ -68,7 +71,7 @@ int main(){
 
 	signal(SIGINT, sighandler);
 
-	bool y = 1; while(true){
+	double a1 = 0, a2 = 0; bool y = 1; while(true){
 		if(signal_status == SIGINT){
 			std::cout << "\nterminated";
 			break;
@@ -99,14 +102,22 @@ int main(){
 		paint();
 		double new_error = loss();
 
+		avg_rate *= AVG_FALLOFF;
+
 		bool reject = 0;
 		if(new_error > error) splat[i] = o1, splat[j] = o2, reject = 1;
-		else error = new_error;
+		else avg_rate += (error-new_error) * (1.0-AVG_FALLOFF), error = new_error;
 
 		auto now = std::chrono::high_resolution_clock::now();
 		double duration = ((std::chrono::duration<double>) (now - start)).count();
-		std::cout << '\r' << iter/1000 << "K  " << error << "E  " << (int) std::floor(duration*1000) << "T  ";
-		std::flush(std::cout);
+		a1 += duration, a2 += duration;
+
+		if(a1 > 0.2){
+			std::cout << '\r' << iter/1000 << "K  " << error << "E  " << (int) std::floor(duration*1000) << "T  ";
+			std::cout << avg_rate << "R  ";
+			std::flush(std::cout);
+			a1 = 0;
+		}
 
 		if(TIMELAPSE && iter%1000 == 0){
 			{
@@ -125,8 +136,10 @@ int main(){
 			};
 		}
 
-		if((++iter)%30 == 0) y = 1;
+		if(a2 > 1) y = 1, a2 = 0;
 		if(!reject && y) write("progress.bmp"), y = 0;
+
+		++iter;
 	}
 
 	std::cout << '\n';
