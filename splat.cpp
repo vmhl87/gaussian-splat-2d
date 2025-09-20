@@ -5,7 +5,7 @@ const int VERSION = 2;
 #include <thread>
 
 struct _splat{
-	double x, y, r[5], c[4];
+	float x, y, r[5], c[4];
 };
 
 int n;
@@ -14,14 +14,14 @@ int iter = 0;
 
 unsigned char *data2;
 int width, height;
-double *canvas;
+float *canvas;
 
 void _paint(int xmin, int ymin, int xmax, int ymax){
 	for(int i=0; i<n; ++i){
 
-		auto SP = [] (double a, double b) { return std::sqrt(a*a+b*b); };
-		double xr = SP(splat[i].r[0]*splat[i].r[2], splat[i].r[1]*splat[i].r[3]),
-			   yr = SP(splat[i].r[0]*splat[i].r[3], splat[i].r[1]*splat[i].r[2]);
+		auto SP = [] (float a, float b) { return std::sqrt(a*a+b*b); };
+		float xr = SP(splat[i].r[0]*splat[i].r[2], splat[i].r[1]*splat[i].r[3]),
+			  yr = SP(splat[i].r[0]*splat[i].r[3], splat[i].r[1]*splat[i].r[2]);
 
 		xr *= 2.2;
 		yr *= 2.2;
@@ -35,10 +35,10 @@ void _paint(int xmin, int ymin, int xmax, int ymax){
 			for(int x=Xmin; x<Xmax; ++x){
 				int j = 3*(x+y*width);
 
-				double rx = splat[i].x-x, ry = splat[i].y-y;
-				double vx = (rx*splat[i].r[2]+ry*splat[i].r[3])/splat[i].r[0],
-					   vy = (ry*splat[i].r[2]-rx*splat[i].r[3])/splat[i].r[1];
-				double alpha = exp(-vx*vx-vy*vy) * splat[i].c[3];
+				float rx = splat[i].x-x, ry = splat[i].y-y;
+				float vx = (rx*splat[i].r[2]+ry*splat[i].r[3])/splat[i].r[0],
+					  vy = (ry*splat[i].r[2]-rx*splat[i].r[3])/splat[i].r[1];
+				float alpha = exp(-vx*vx-vy*vy) * splat[i].c[3];
 
 				for(int z=0; z<3; ++z)
 					canvas[j+z] = canvas[j+z]*(1.0-alpha) + splat[i].c[z]*alpha;

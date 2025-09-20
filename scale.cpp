@@ -21,7 +21,7 @@ int main(int argc, const char **argv){
 
 	width *= scale, height *= scale;
 	data2 = new unsigned char[width*height*3];
-	canvas = new double[width*height*3];
+	canvas = new float[width*height*3];
 
 	for(int i=0; i<n; ++i){
 		splat[i].x *= scale, splat[i].y *= scale;
@@ -33,7 +33,7 @@ int main(int argc, const char **argv){
 	paint();
 
 	auto now = std::chrono::high_resolution_clock::now();
-	double duration = ((std::chrono::duration<double>) (now-start)).count();
+	float duration = ((std::chrono::duration<float>) (now-start)).count();
 	std::cout << "upscaled in " << (int) std::floor(duration*1000) << "ms\n";
 
 	write(argv[2]);
