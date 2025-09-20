@@ -1,3 +1,7 @@
+const int TIMELAPSE = 1;
+const int DEFAULT_SPLATS = 512;
+const double RATE = 0.1;
+
 #include <iostream>
 #include <random>
 #include <chrono>
@@ -33,7 +37,7 @@ double loss(){
 		ret += diff*diff;
 	}
 
-	return (double) ret * 100.0 / width / height / 3.0 / 255.0 / 255.0;
+	return (double) ret/ width / height / 3.0;
 }
 
 int main(){
@@ -44,29 +48,23 @@ int main(){
 	data2 = new unsigned char[width*height*3];
 	canvas = new double[width*height*3];
 	
-	if(E) for(int i=0; i<n; ++i){
-		splat[i].x = rng()*width, splat[i].y = rng()*height;
-		splat[i].r[0] = rng()*diag/16 + 3.0;
-		splat[i].r[1] = rng()*diag/16 + 3.0;
-		double theta = rng()*M_PI*2.0;
-		splat[i].r[2] = std::cos(theta);
-		splat[i].r[3] = std::sin(theta);
-		for(int j=0; j<4; ++j) splat[i].c[j] = rng();
+	if(E){
+		n = DEFAULT_SPLATS;
+		splat = new _splat[n];
+
+		for(int i=0; i<n; ++i){
+			splat[i].x = rng()*width, splat[i].y = rng()*height;
+			splat[i].r[0] = rng()*diag/16 + 3.0;
+			splat[i].r[1] = rng()*diag/16 + 3.0;
+			splat[i].r[4] = rng()*M_PI*2.0;
+			splat[i].r[2] = std::cos(splat[i].r[4]);
+			splat[i].r[3] = std::sin(splat[i].r[4]);
+			for(int j=0; j<4; ++j) splat[i].c[j] = rng();
+		}
 	}
 
 	paint();
 	double error = loss();
-
-	/*
-	for(int i=0; i<n; ++i)
-		for(int j=0; j<3; ++j)
-			splat[i].c[j] = (double) data[
-				((int)std::floor(splat[i].x)+
-				 (int)std::floor(splat[i].y)*width)*3+j]/255.0;
-
-	paint();
-	if(loss() > error) read_splats("config.txt"); else error = loss();
-	*/
 
 	signal(SIGINT, sighandler);
 
@@ -78,22 +76,31 @@ int main(){
 
 		auto start = std::chrono::high_resolution_clock::now();
 
-		int i = rand()%n;
-		_splat old = splat[i];
+		int i = rand()%n, j = i;
+		if(i != n-1) j = i+rand()%(n-1-i);
 
-		splat[i].x = rng()*width, splat[i].y = rng()*height;
-		splat[i].r[0] = rng()*diag/16;
-		splat[i].r[1] = rng()*diag/16;
-		double theta = rng()*M_PI*2.0;
-		splat[i].r[2] = std::cos(theta);
-		splat[i].r[3] = std::sin(theta);
-		for(int j=0; j<4; ++j) splat[i].c[j] = rng();
+		_splat o1 = splat[i], o2 = splat[j];
+
+		auto M = [] (double &d, double m) {
+			d = std::max(0.0, std::min(1.0, d/m + (rng()*2.0-1.0)*RATE)) * m;
+		};
+
+		M(splat[i].x, width);
+		M(splat[i].y, height);
+		M(splat[i].r[0], diag/16);
+		M(splat[i].r[1], diag/16);
+		for(int z=0; z<4; ++z) M(splat[i].c[z], 1.0);
+		splat[i].r[4] = std::fmod(splat[i].r[4]/M_PI/2.0 + (rng()*2.0-1.0)*RATE, 1.0)*M_PI*2.0;
+		splat[i].r[2] = std::cos(splat[i].r[4]);
+		splat[i].r[3] = std::sin(splat[i].r[4]);
+
+		if(i != j && splat[j].x*splat[j].y > splat[i].x*splat[i].y) std::swap(splat[i], splat[j]);
 
 		paint();
 		double new_error = loss();
 
 		bool reject = 0;
-		if(new_error > error) splat[i] = old, reject = 1;
+		if(new_error > error) splat[i] = o1, splat[j] = o2, reject = 1;
 		else error = new_error;
 
 		auto now = std::chrono::high_resolution_clock::now();
@@ -101,7 +108,7 @@ int main(){
 		std::cout << '\r' << iter/1000 << "K  " << error << "E  " << (int) std::floor(duration*1000) << "T  ";
 		std::flush(std::cout);
 
-		if(iter%1000 == 0){
+		if(TIMELAPSE && iter%1000 == 0){
 			{
 				std::string s = "frames/" + std::to_string(iter/1000) + ".bmp";
 				write(s.c_str());

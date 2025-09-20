@@ -1,11 +1,11 @@
-const int VERSION = 1;
+const int VERSION = 2;
 
 #include <sstream>
 #include <fstream>
 #include <thread>
 
 struct _splat{
-	double x, y, r[4], c[4];
+	double x, y, r[5], c[4];
 };
 
 int n;
@@ -98,7 +98,7 @@ int read_splats(const char *filename){
 
 	for(int i=0; i<n; ++i){
 		F >> splat[i].x >> splat[i].y;
-		for(int j=0; j<4; ++j) F >> splat[i].r[j];
+		for(int j=0; j<5; ++j) F >> splat[i].r[j];
 		for(int j=0; j<4; ++j) F >> splat[i].c[j];
 	}
 
@@ -120,7 +120,7 @@ void write_splats(const char *filename){
 
 	for(int i=0; i<n; ++i){
 		F << splat[i].x << ' ' << splat[i].y << ' ';
-		for(int j=0; j<4; ++j) F << splat[i].r[j] << ' ';
+		for(int j=0; j<5; ++j) F << splat[i].r[j] << ' ';
 		for(int j=0; j<4; ++j) F << splat[i].c[j] << " \n"[j==3];
 	}
 

@@ -1,6 +1,7 @@
 run
-frames/
-progress.bmp
-reference-crop.bmp
+*.bmp
+frames/*.bmp
+frames/*.stat
+frames/*.conf
 prep-reference-image/*.bmp
 prep-reference-image/*.jpg
