@@ -91,7 +91,7 @@ void write(const char *filename){
 int main(){
 	int E = read_splats("scene.conf");
 
-	read_bmp("reference.bmp", &data, &width, &height);
+	read_bmp("reference-crop.bmp", &data, &width, &height);
 	int diag = std::sqrt(width*width + height*height);
 	data2 = new unsigned char[width*height*3];
 	canvas = new double[width*height*3];
