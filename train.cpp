@@ -1,10 +1,10 @@
 // HYPER
 
-const int TIMELAPSE = 0;
-const int DEFAULT_SPLATS = 256;
+const int RECORD = 1;
+const int DEFAULT_SPLATS = 4096;
 const int DEFAULT_PARTICLES = 32;
 
-const float IMP_TUNE = 1.0;
+const float IMP_TUNE = 2.0;
 const int IMP_RAD = 10;
 
 // DFL
@@ -14,8 +14,7 @@ const int IMP_RAD = 10;
 #include <random>
 #include <chrono>
 
-#include "src/write_bmp.cpp"
-#include "src/read_bmp.cpp"
+#include "bmp.cpp"
 
 // RESUME
 
@@ -33,20 +32,31 @@ namespace c0{
 	std::random_device rd;
 	std::default_random_engine gen(rd());
 	std::uniform_real_distribution<float> uniform(0.0, 1.0);
-	std::normal_distribution<float> gaussian(0.0, 1.0);
 }
 
 inline float rng(){
 	return c0::uniform(c0::gen);
 }
 
-inline float norm(){
-	return c0::gaussian(c0::gen);
-}
-
 // CORE
 
 #include "splat.cpp"
+
+// LEARNING RATES
+
+namespace hist{
+	float sum[3] = {0, 0, 0};
+	int count[3] = {0, 0, 0};
+
+	void tick(int i, float v){
+		sum[i] += v * 1e3; ++count[i];
+		if(count[i] > 500) count[i] /= 2, sum[i] /= 2;
+	}
+
+	float avg(int i){
+		return count[i] ? sum[i] / count[i] : 0.0;
+	}
+};
 
 // REFERENCE IMAGE
 
@@ -136,8 +146,8 @@ void load_reference(const char *filename){
 
 // LOSS IMPL
 
-float loss(_state &s){
-	paint(s);
+float loss(){
+	paint();
 
 	long long ret = 0;
 
@@ -146,7 +156,7 @@ float loss(_state &s){
 		ret += diff*diff * c1::imp[i];
 	}
 
-	return s.loss = (float) ret/c1::imp_total;
+	return (float) ret/c1::imp_total;
 }
 
 // MAIN
@@ -158,13 +168,9 @@ int main(){
 
 	load_reference("reference.bmp");
 
-	if(E) init_particles();
+	if(E) init_state();
 
-	/*
-	std::cout << best.data[0].x << ' ' << best.data[1].y << '\n';
-	std::cout << best.data[0].r[0] << ' ' << best.data[1].r[1] << '\n';
-	paint(best); write("progress.bmp"); return 1;
-	*/
+	float error = loss();
 
 	signal(SIGINT, sighandler);
 
@@ -177,37 +183,80 @@ int main(){
 		auto start = std::chrono::high_resolution_clock::now();
 
 		// BEGIN UPDATE
+		
+		int T = rand()%3, i = rand()%n;
 
-		for(int i=0; i<particles; ++i){
-			for(int j=0; j<n; ++j){
-#define S particle[i].now.data[j]
-#define B particle[i].best.data[j]
-#define G best.data[j]
-				auto E = [] (float a, float b) { return (a+b)/2.0 + norm() * std::abs(a-b); };
+		_splat old = splat[i];
 
-				S.x = std::clamp(E(B.x, G.x), 0.0, (double) width);
-				S.y = std::clamp(E(B.y, G.y), 0.0, (double) height);
+		if(T == 0){
+			splat[i].x = rng()*width;
+			splat[i].y = rng()*height;
 
-				S.r[0] = std::clamp(E(B.r[0], G.r[0]), 0.5, diag/16.0);
-				S.r[1] = std::clamp(E(B.r[1], G.r[1]), 0.5, diag/16.0);
+			splat[i].r[0] = rng()*diag/16 + 3.0;
+			splat[i].r[1] = rng()*diag/16 + 3.0;
 
-				S.r[4] = std::fmod(std::fmod(E(B.r[4], G.r[4]), M_PI*2.0) + M_PI*2.0, M_PI*2.0);
-				S.r[2] = std::cos(S.r[2]);
-				S.r[3] = std::cos(S.r[2]);
+			splat[i].r[4] = rng()*M_PI*2.0;
+			splat[i].r[2] = std::cos(splat[i].r[4]);
+			splat[i].r[3] = std::sin(splat[i].r[4]);
 
-				for(int z=0; z<3; ++z)
-					S.c[z] = std::clamp(E(B.c[z], G.c[z]), 0.0, 1.0);
-#undef S
-#undef B
-#undef G
+			for(int z=0; z<4; ++z) splat[i].c[z] = rng();
+		}
+
+		if(T == 1){
+			float RATE = rng()*0.1;
+
+			auto M = [RATE] (float &d, float m) {
+				d = std::max(0.0, std::min(1.0, d/m + (rng()*2.0-1.0)*RATE)) * m;
+			};
+
+			M(splat[i].x, width), M(splat[i].y, height);
+
+			splat[i].r[0] = std::max(0.5, std::min(
+				diag/16.0, splat[i].r[0] + (rng()*2.0-1.0)*RATE*16/diag));
+			splat[i].r[1] = std::max(0.5, std::min(
+				diag/16.0, splat[i].r[1] + (rng()*2.0-1.0)*RATE*16/diag));
+
+			for(int z=0; z<4; ++z) M(splat[i].c[z], 1.0);
+
+			float E = splat[i].r[1]>splat[i].r[0] ?
+				splat[i].r[1]/splat[i].r[0] : splat[i].r[0]/splat[i].r[1];
+			float R2 = RATE + (1.0-RATE) * exp(1.0-E);
+			splat[i].r[4] = std::fmod(splat[i].r[4]/M_PI/2.0 + (rng()*2.0-1.0)*R2, 1.0)*M_PI*2.0;
+			splat[i].r[2] = std::cos(splat[i].r[4]);
+			splat[i].r[3] = std::sin(splat[i].r[4]);
+		}
+
+		if(T == 2){
+			float RATE = rng()*0.5;
+			int C = rand()%9;
+
+			auto M = [RATE] (float &d, float m) {
+				d = std::max(0.0, std::min(1.0, d/m + (rng()*2.0-1.0)*RATE)) * m;
+			};
+
+			if(C == 0) M(splat[i].x, width);
+			if(C == 1) M(splat[i].y, height);
+
+			if(C == 2) splat[i].r[0] = std::max(0.5, std::min(
+				diag/16.0, splat[i].r[0] + (rng()*2.0-1.0)*RATE*16/diag));
+			if(C == 3) splat[i].r[1] = std::max(0.5, std::min(
+				diag/16.0, splat[i].r[1] + (rng()*2.0-1.0)*RATE*16/diag));
+
+			if(C == 4){
+				float E = splat[i].r[1]>splat[i].r[0] ?
+					splat[i].r[1]/splat[i].r[0] : splat[i].r[0]/splat[i].r[1];
+				float R2 = RATE + (1.0-RATE) * exp(1.0-E);
+				splat[i].r[4] = std::fmod(splat[i].r[4]/M_PI/2.0 + (rng()*2.0-1.0)*R2, 1.0)*M_PI*2.0;
+				splat[i].r[2] = std::cos(splat[i].r[4]);
+				splat[i].r[3] = std::sin(splat[i].r[4]);
 			}
 
-			if(loss(particle[i].now) < particle[i].best.loss)
-				copystate(particle[i].now, particle[i].best);
-
-			if(particle[i].best.loss < best.loss)
-				copystate(particle[i].best, best);
+			for(int z=0; z<4; ++z) if(C == 5+z) M(splat[i].c[z], 1.0);
 		}
+
+		float new_error = loss();
+		if(new_error > error) splat[i] = old, hist::tick(T, 0);
+		else hist::tick(T, error-new_error), error = new_error;
 
 		// END UPDATE
 
@@ -217,22 +266,16 @@ int main(){
 
 		if(iter%1000 == 0 && iter) std::cout << '\n';
 
-		if(a1 > 0.2){
-			std::cout << best.loss << '\n';
-			for(int i=0; i<particles; ++i)
-				std::cout << particle[i].best.loss << ' ' << particle[i].now.loss << '\n';
-			std::cout << '\n';
-			/*
-			std::cout << '\r' << iter/1000 << "K  " << best.loss << "E  ";
+		if(a1 > 0.5){
+			std::cout << '\r' << iter/1000 << "K  " << error << "E  ";
+			std::cout << hist::avg(0) << ' ' << hist::avg(1) << ' ' << hist::avg(2) << "A  ";
 			std::cout << (int) std::floor(a1/y2*1000) << "T  ";
-			//std::cout << hist::avg(error) << "A  " << RATE << "R  ";
 			std::flush(std::cout);
-			*/
 			a1 = 0, y2 = 0;
 		}
 
-		if(TIMELAPSE && iter%1000 == 0){
-			paint(best);
+		if(RECORD && iter%1000 == 0){
+			paint();
 
 			{
 				std::string s = "frames/" + std::to_string(iter/1000) + ".bmp";
@@ -245,13 +288,17 @@ int main(){
 			{
 				std::string s = "frames/" + std::to_string(iter/1000) + ".stat";
 				std::ofstream v(s);
-				v << best.loss << '\n';
+				v << error << ',' << hist::avg(0) << ',' << hist::avg(1) << ',' << hist::avg(2) << '\n';
 				v.close();
 			};
 		}
 
 		if(a2 > 1) y = 1, a2 = 0;
-		if(y) paint(best), write("progress.bmp"), y = 0;
+		if(y) paint(), write("progress.bmp"), y = 0;
+
+		// AUTO PARAMETERIZE
+		{
+		};
 
 		++iter;
 	}

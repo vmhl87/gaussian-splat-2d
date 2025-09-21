@@ -1,4 +1,4 @@
-const int VERSION = 4;
+const int VERSION = 5;
 
 #include <fstream>
 #include <cstring>
@@ -9,28 +9,17 @@ struct _splat{
 	float x, y, r[5], c[4];
 };
 
-struct _state{
-	_splat *data;
-	float loss;
-};
-
-struct _particle{
-	_state now, best;
-};
-
 // signature
 
-float loss(_state &s);
-void paint(_state &s);
+float loss();
+void paint();
 
-void init_particles();
-void copystate(_state &a, _state &b);
+void init_state();
 
 // glob
 
-int n, particles;
-_particle *particle;
-_state best;
+int n;
+_splat *splat;
 
 int iter = 0;
 
@@ -40,47 +29,24 @@ float diag, *canvas;
 
 // imp
 
-void copystate(_state &a, _state &b){
-	std::memcpy(b.data, a.data, n * sizeof(_splat));
-	b.loss = a.loss;
-}
-
-void init_state(_state &s){
-	s.data = new _splat[n];
-}
-
-void init_particles(){
+void init_state(){
 	n = DEFAULT_SPLATS;
-	particles = DEFAULT_PARTICLES;
 
-	init_state(best);
-	particle = new _particle[particles];
-	for(int i=0; i<particles; ++i) init_state(particle[i].now), init_state(particle[i].best);
+	splat = new _splat[n];
 
-	float best_loss = 1e9;
-	int best_idx = -1;
+	for(int i=0; i<n; ++i){
+		splat[i].x = rng()*width;
+		splat[i].y = rng()*height;
 
-	for(int i=0; i<particles; ++i){
-		for(int j=0; j<n; ++j){
-			particle[i].now.data[j].x = rng()*width;
-			particle[i].now.data[j].y = rng()*height;
+		splat[i].r[0] = rng()*diag/16 + 3.0;
+		splat[i].r[1] = rng()*diag/16 + 3.0;
 
-			particle[i].now.data[j].r[0] = rng()*diag/16 + 3.0;
-			particle[i].now.data[j].r[1] = rng()*diag/16 + 3.0;
+		splat[i].r[4] = rng()*M_PI*2.0;
+		splat[i].r[2] = std::cos(splat[i].r[4]);
+		splat[i].r[3] = std::sin(splat[i].r[4]);
 
-			particle[i].now.data[j].r[4] = rng()*M_PI*2.0;
-			particle[i].now.data[j].r[2] = std::cos(particle[i].now.data[j].r[4]);
-			particle[i].now.data[j].r[3] = std::sin(particle[i].now.data[j].r[4]);
-
-			for(int z=0; z<4; ++z) particle[i].now.data[j].c[z] = rng();
-		}
-
-		if(loss(particle[i].now) < best_loss) best_loss = particle[i].now.loss, best_idx = i;
-
-		copystate(particle[i].now, particle[i].best);
+		for(int z=0; z<4; ++z) splat[i].c[z] = rng();
 	}
-
-	if(best_idx != -1) copystate(particle[best_idx].now, best);
 }
 
 #include "render.cpp"
@@ -105,14 +71,11 @@ int read_state(const char *filename){
 		}
 	}
 
-	F >> particles >> n;
+	F >> n;
 
-	if(particles <= 0) std::cerr << "INVALID PARTICLE COUNT: " << n << "\nABORTING\n", exit(1);
 	if(n <= 0) std::cerr << "INVALID SPLAT COUNT: " << n << "\nABORTING\n", exit(1);
 
-	init_state(best);
-	particle = new _particle[particles];
-	for(int i=0; i<particles; ++i) init_state(particle[i].now), init_state(particle[i].best);
+	splat = new _splat[n];
 
 	F >> width >> height;
 
@@ -130,34 +93,12 @@ int read_state(const char *filename){
 		f = ret;
 	};
 
-	in(best.loss);
 	for(int i=0; i<n; ++i){
-		in(best.data[i].x), in(best.data[i].y);
-		in(best.data[i].r[0]), in(best.data[i].r[1]), in(best.data[i].r[4]);
-		best.data[i].r[2] = std::cos(best.data[i].r[4]);
-		best.data[i].r[3] = std::sin(best.data[i].r[4]);
-		for(int j=0; j<4; ++j) in(best.data[i].c[j]);
-	}
-
-	for(int x=0; x<particles; ++x){
-		in(particle[x].best.loss);
-		for(int i=0; i<n; ++i){
-			in(particle[x].best.data[i].x), in(particle[x].best.data[i].y);
-			in(particle[x].best.data[i].r[0]), in(particle[x].best.data[i].r[1]);
-			in(particle[x].best.data[i].r[4]);
-			particle[x].best.data[i].r[2] = std::cos(particle[x].best.data[i].r[4]);
-			particle[x].best.data[i].r[3] = std::sin(particle[x].best.data[i].r[4]);
-			for(int j=0; j<4; ++j) in(particle[x].best.data[i].c[j]);
-		}
-		in(particle[x].now.loss);
-		for(int i=0; i<n; ++i){
-			in(particle[x].now.data[i].x), in(particle[x].now.data[i].y);
-			in(particle[x].now.data[i].r[0]), in(particle[x].now.data[i].r[1]);
-			in(particle[x].now.data[i].r[4]);
-			particle[x].now.data[i].r[2] = std::cos(particle[x].now.data[i].r[4]);
-			particle[x].now.data[i].r[3] = std::sin(particle[x].now.data[i].r[4]);
-			for(int j=0; j<4; ++j) in(particle[x].now.data[i].c[j]);
-		}
+		in(splat[i].x), in(splat[i].y);
+		in(splat[i].r[0]), in(splat[i].r[1]), in(splat[i].r[4]);
+		splat[i].r[2] = std::cos(splat[i].r[4]);
+		splat[i].r[3] = std::sin(splat[i].r[4]);
+		for(int j=0; j<4; ++j) in(splat[i].c[j]);
 	}
 
     F.close();
@@ -170,7 +111,7 @@ void write_state(const char *filename){
 
 	F << "VERSION " << VERSION << '\n';
 
-	F << particles << ' ' << n << '\n';
+	F << n << '\n';
 
 	F << width << ' ' << height << '\n';
 	
@@ -181,29 +122,10 @@ void write_state(const char *filename){
 		for(int i=0; i<sizeof(float); ++i) F << d[i];
 	};
 
-	out(best.loss);
 	for(int i=0; i<n; ++i){
-		out(best.data[i].x), out(best.data[i].y);
-		out(best.data[i].r[0]), out(best.data[i].r[1]);
-		out(best.data[i].r[4]);
-		for(int j=0; j<4; ++j) out(best.data[i].c[j]);
-	}
-
-	for(int x=0; x<particles; ++x){
-		out(particle[x].best.loss);
-		for(int i=0; i<n; ++i){
-			out(particle[x].best.data[i].x), out(particle[x].best.data[i].y);
-			out(particle[x].best.data[i].r[0]), out(particle[x].best.data[i].r[1]);
-			out(particle[x].best.data[i].r[4]);
-			for(int j=0; j<4; ++j) out(particle[x].best.data[i].c[j]);
-		}
-		out(particle[x].now.loss);
-		for(int i=0; i<n; ++i){
-			out(particle[x].now.data[i].x), out(particle[x].now.data[i].y);
-			out(particle[x].now.data[i].r[0]), out(particle[x].now.data[i].r[1]);
-			out(particle[x].now.data[i].r[4]);
-			for(int j=0; j<4; ++j) out(particle[x].now.data[i].c[j]);
-		}
+		out(splat[i].x), out(splat[i].y);
+		out(splat[i].r[0]), out(splat[i].r[1]), out(splat[i].r[4]);
+		for(int j=0; j<4; ++j) out(splat[i].c[j]);
 	}
 
     F.close();

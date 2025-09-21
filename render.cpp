@@ -2,7 +2,7 @@
 #include <fstream>
 #include <thread>
 
-void _paint(_splat *splat, int xmin, int ymin, int xmax, int ymax){
+void _paint(int xmin, int ymin, int xmax, int ymax){
 	for(int i=0; i<n; ++i){
 
 		auto SP = [] (float a, float b) { return std::sqrt(a*a+b*b); };
@@ -33,16 +33,16 @@ void _paint(_splat *splat, int xmin, int ymin, int xmax, int ymax){
 	}
 }
 
-void paint(_state &s){
+void paint(){
 	for(int i=0; i<width*height*3; ++i) canvas[i] = 1.0;
 	
 	int nthreads = 10;
 	std::thread threads[nthreads-1];
 
 	for(int i=1; i<nthreads; ++i)
-		threads[i-1] = std::thread(_paint, s.data, 0, height*(i-1)/nthreads, width, height*i/nthreads);
+		threads[i-1] = std::thread(_paint, 0, height*(i-1)/nthreads, width, height*i/nthreads);
 
-	_paint(s.data, 0, height*(nthreads-1)/nthreads, width, height);
+	_paint(0, height*(nthreads-1)/nthreads, width, height);
 	
 	for(int i=1; i<nthreads; ++i) threads[i-1].join();
 }
