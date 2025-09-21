@@ -298,6 +298,7 @@ int main(){
 
 		// AUTO PARAMETERIZE
 		{
+			if(iter == 300e3) break;
 		};
 
 		++iter;
