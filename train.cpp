@@ -1,9 +1,9 @@
 const int TIMELAPSE = 1;
 const int DEFAULT_SPLATS = 512;
-const int SPRAY = 1;
+const int SPRAY = 0;
 const int MOVE_ALL = 0;
-const int MOVE_FAST = 0;
-const float RATE = 0.5;
+const int MOVE_FAST = 1;
+const float RATE = 0.1;
 const float BACK = 0.0;
 
 #include <iostream>
@@ -29,28 +29,22 @@ inline float rng(){
 	return uniform(gen);
 }
 
-struct hist{
-	float sum = 0.0;
-	int count = 0, range;
+namespace hist{
+	float last_error;
+	int count = 0;
 
-	hist(int r){
-		range = r;
-	}
-
-	void tick(float v){
-		sum += v;
+	void tick(float e){
 		++count;
-
-		if(count == range)
-			sum /= 2, count /= 2;
+		if(count == 1000){
+			last_error = (e+last_error)/2;
+			count /= 2;
+		}
 	}
 
-	float avg(){
-		return count ? sum/count : 0;
+	float avg(float e){
+		return count ? (last_error-e)/count : 0.0;
 	}
 };
-
-hist hist1(1000);
 
 #include "splat.cpp"
 
@@ -94,10 +88,11 @@ int main(){
 
 	paint();
 	double error = loss();
+	hist::last_error = error;
 
 	signal(SIGINT, sighandler);
 
-	float a1 = 0, a2 = 0; int y = 1, y2 = 0, count = 0; while(true){
+	float a1 = 0, a2 = 0; int y = 1, count = 0; while(true){
 		if(signal_status == SIGINT){
 			std::cout << "\nterminated";
 			break;
@@ -154,8 +149,10 @@ int main(){
 		double new_error = loss();
 
 		bool reject = 0;
-		if(new_error > error + BACK) splat[i] = o1, splat[j] = o2, reject = 1, hist1.tick(0);
-		else hist1.tick(error-new_error), error = new_error;
+		if(new_error > error + BACK) splat[i] = o1, splat[j] = o2, reject = 1;
+		else error = new_error;
+
+		hist::tick(error);
 
 		auto now = std::chrono::high_resolution_clock::now();
 		float duration = ((std::chrono::duration<float>) (now - start)).count();
@@ -165,36 +162,32 @@ int main(){
 
 		if(a1 > 0.2){
 			std::cout << '\r' << iter/1000 << "K  " << error << "E  " << (int) std::floor(duration*1000) << "T  ";
-			std::cout << hist1.avg() << "A  " << RATE << "R  ";
+			std::cout << hist::avg(error) << "A  " << RATE << "R  ";
 			std::flush(std::cout);
 			a1 = 0;
 		}
 
-		if(TIMELAPSE && iter%1000 == 0) y2 = 1;
+		if(TIMELAPSE && iter%1000 == 0){
+			if(reject) paint();
+
+			{
+				std::string s = "frames/" + std::to_string(iter/1000) + ".bmp";
+				write(s.c_str());
+			};
+			{
+				std::string s = "frames/" + std::to_string(iter/1000) + ".conf";
+				write_splats(s.c_str());
+			};
+			{
+				std::string s = "frames/" + std::to_string(iter/1000) + ".stat";
+				std::ofstream v(s);
+				v << error << '\n';
+				v.close();
+			};
+		}
 
 		if(a2 > 1) y = 1, a2 = 0;
-		if(!reject && y){
-			write("progress.bmp"), y = 0;
-
-			if(y2){
-				{
-					std::string s = "frames/" + std::to_string(iter/1000) + ".bmp";
-					write(s.c_str());
-				};
-				{
-					std::string s = "frames/" + std::to_string(iter/1000) + ".conf";
-					write_splats(s.c_str());
-				};
-				{
-					std::string s = "frames/" + std::to_string(iter/1000) + ".stat";
-					std::ofstream v(s);
-					v << error << '\n';
-					v.close();
-				};
-
-				y2 = 0;
-			}
-		}
+		if(!reject && y) write("progress.bmp"), y = 0;
 
 		++iter;
 	}
