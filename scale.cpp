@@ -19,7 +19,6 @@ int main(int argc, const char **argv){
 
 	read_splats(argv[1]);
 
-	/*
 	if(argc >= 5){
 		float S = std::stoi(argv[4])/1e2;
 		for(int i=0; i<n; ++i){
@@ -27,7 +26,6 @@ int main(int argc, const char **argv){
 			splat[i].r[1] *= S;
 		}
 	}
-	*/
 
 	width *= scale, height *= scale;
 	data2 = new unsigned char[width*height*3];

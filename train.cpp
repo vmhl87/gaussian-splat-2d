@@ -1,9 +1,9 @@
 const int TIMELAPSE = 1;
-const int DEFAULT_SPLATS = 512;
-const int SPRAY = 0;
+const int DEFAULT_SPLATS = 4096;
+const int SPRAY = 1;
 const int MOVE_ALL = 0;
-const int MOVE_FAST = 1;
-const float RATE = 0.1;
+const int MOVE_FAST = 0;
+const float RATE = 0.5;
 const float BACK = 0.0;
 
 #include <iostream>
@@ -51,14 +51,14 @@ namespace hist{
 unsigned char *data;
 
 double loss(){
-	int ret = 0;
+	long long ret = 0;
 
 	for(int i=0; i<width*height*3; ++i){
 		int diff = (int) data[i] - std::max(0, std::min(255, (int) std::floor(255.0 * canvas[i])));
-		ret += diff*diff;
+		ret += diff*diff * (((i/3)%width) < width/2 ? 7 : 1);
 	}
 
-	return (double) ret/ width / height / 3.0;
+	return (double) ret / width / height / 3.0 / 4;
 }
 
 int main(){
@@ -70,6 +70,21 @@ int main(){
 	float diag = std::sqrt(width*width + height*height);
 	data2 = new unsigned char[width*height*3];
 	canvas = new float[width*height*3];
+
+	/*
+	// BEGIN ABNORMAL OPERATION
+	
+	for(int y=0; y<height; ++y){
+		for(int x=0; x<width; ++x){
+		}
+	}
+
+	write_bmp("progress.bmp", data2, width, height);
+
+	return 0;
+
+	// RESUME NORMAL OPERATION
+	*/
 	
 	if(E){
 		n = DEFAULT_SPLATS;
@@ -143,7 +158,7 @@ int main(){
 			for(int j=0; j<4; ++j) splat[i].c[j] = rng();
 		}
 
-		if(i != j && splat[j].x*splat[j].y > splat[i].x*splat[i].y) std::swap(splat[i], splat[j]);
+		if(i != j && splat[j].x*splat[j].y > splat[i].x*splat[i].y*1.5) std::swap(splat[i], splat[j]);
 
 		paint();
 		double new_error = loss();
@@ -158,7 +173,7 @@ int main(){
 		float duration = ((std::chrono::duration<float>) (now - start)).count();
 		a1 += duration, a2 += duration;
 
-		if(iter%1000 == 0) std::cout << '\n';
+		if(iter%1000 == 0 && iter) std::cout << '\n';
 
 		if(a1 > 0.2){
 			std::cout << '\r' << iter/1000 << "K  " << error << "E  " << (int) std::floor(duration*1000) << "T  ";
