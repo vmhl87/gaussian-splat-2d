@@ -254,8 +254,9 @@ int main(){
 			for(int z=0; z<4; ++z) if(C == 5+z) M(splat[i].c[z], 1.0);
 		}
 
+		int reject = 0;
 		float new_error = loss();
-		if(new_error > error) splat[i] = old, hist::tick(T, 0);
+		if(new_error > error) splat[i] = old, hist::tick(T, 0), reject = 1;
 		else hist::tick(T, error-new_error), error = new_error;
 
 		// END UPDATE
@@ -275,7 +276,7 @@ int main(){
 		}
 
 		if(RECORD && iter%1000 == 0){
-			paint();
+			if(reject) paint(), reject = 0;
 
 			{
 				std::string s = "frames/" + std::to_string(iter/1000) + ".bmp";
@@ -294,11 +295,14 @@ int main(){
 		}
 
 		if(a2 > 1) y = 1, a2 = 0;
-		if(y) paint(), write("progress.bmp"), y = 0;
+		if(y){
+			if(reject) paint(), reject = 0;
+			write("progress.bmp"), y = 0;
+		}
 
 		// AUTO PARAMETERIZE
 		{
-			if(iter == 300e3) break;
+			if(iter == 1600e3) break;
 		};
 
 		++iter;

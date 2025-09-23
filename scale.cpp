@@ -1,11 +1,17 @@
 #include <iostream>
+#include <random>
 #include <thread>
 #include <chrono>
 #include <cmath>
 
-#include "src/write_bmp.cpp"
-#include "src/read_bmp.cpp"
+int DEFAULT_SPLATS;
 
+std::random_device rd;
+std::default_random_engine gen(rd());
+std::uniform_real_distribution<float> uniform(0.0, 1.0);
+inline float rng() { return uniform(gen); }
+
+#include "bmp.cpp"
 #include "splat.cpp"
 
 int main(int argc, const char **argv){
@@ -17,11 +23,19 @@ int main(int argc, const char **argv){
 
 	int scale = std::stoi(argv[3]);
 
-	read_splats(argv[1]);
+	read_state(argv[1]);
 
 	if(argc >= 5){
-		float S = std::stoi(argv[4])/1e2;
+		int _S = std::stoi(argv[4]);
+		float S = S/1e2;
+		
 		for(int i=0; i<n; ++i){
+			if(_S == -1){
+				for(int z=0; z<3; ++z)
+					splat[i].c[z] = rng();
+				continue;
+			}
+
 			splat[i].r[0] *= S;
 			splat[i].r[1] *= S;
 		}
