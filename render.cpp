@@ -2,6 +2,14 @@
 #include <fstream>
 #include <thread>
 
+void save_canvas(){
+	std::memcpy(canvas2, canvas, sizeof(float)*width*height*3);
+}
+
+void restore_canvas(){
+	std::memcpy(canvas, canvas2, sizeof(float)*width*height*3);
+}
+
 void bbox(_splat &s, int &xmin, int &ymin, int &xmax, int &ymax){
 	auto SP = [] (float a, float b) { return std::sqrt(a*a+b*b); };
 	float xr = SP(s.r[0]*s.r[2], s.r[1]*s.r[3]),

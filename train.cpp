@@ -86,6 +86,7 @@ void load_reference(const char *filename){
 
 	data2 = new unsigned char[width*height*3];
 	c1::imp = new float[width*height*3];
+	canvas2 = new float[width*height*3];
 	canvas = new float[width*height*3];
 
 	const int rad = IMP_RAD, crad = std::ceil(rad * 2.2);
@@ -290,15 +291,12 @@ int main(){
 			for(int z=0; z<4; ++z) if(C == 5+z) M(splat[i].c[z], 1.0);
 		}
 
+		save_canvas();
 		paint(old), paint(splat[i]);
 		float new_error = loss(0, 0, width, height);
 
-		if(new_error > error){
-			splat[i].c[3] = 0.0, paint(splat[i]);
-			splat[i] = old, paint(old);
-			hist::tick(T, 0);
-
-		}else hist::tick(T, error-new_error), error = new_error;
+		if(new_error > error) splat[i] = old, restore_canvas(), hist::tick(T, 0);
+		else hist::tick(T, error-new_error), error = new_error;
 
 		// END UPDATE
 

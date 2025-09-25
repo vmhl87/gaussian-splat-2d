@@ -25,7 +25,7 @@ int iter = 0;
 
 unsigned char *data2;
 int width = -1, height = -1;
-float diag, *canvas;
+float diag, *canvas, *canvas2;
 
 // imp
 
