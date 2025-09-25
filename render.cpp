@@ -2,20 +2,37 @@
 #include <fstream>
 #include <thread>
 
+void bbox(_splat &s, int &xmin, int &ymin, int &xmax, int &ymax){
+	auto SP = [] (float a, float b) { return std::sqrt(a*a+b*b); };
+	float xr = SP(s.r[0]*s.r[2], s.r[1]*s.r[3]),
+		  yr = SP(s.r[0]*s.r[3], s.r[1]*s.r[2]);
+
+	xr *= 2.2;
+	yr *= 2.2;
+
+	xmin = std::max(0, (int) std::floor(s.x-xr));
+	xmax = std::min(width, (int) std::ceil(s.x+xr) + 1);
+	ymin = std::max(0, (int) std::floor(s.y-yr));
+	ymax = std::min(height, (int) std::ceil(s.y+yr) + 1);
+}
+
 void _paint(int xmin, int ymin, int xmax, int ymax){
+	for(int y=ymin; y<ymax; ++y){
+		for(int x=xmin; x<xmax; ++x){
+			for(int z=0; z<3; ++z){
+				canvas[3*(x+y*width)+z] = 1.0;
+			}
+		}
+	}
+
 	for(int i=0; i<n; ++i){
+		int Xmin, Ymin, Xmax, Ymax;
+		bbox(splat[i], Xmin, Ymin, Xmax, Ymax);
 
-		auto SP = [] (float a, float b) { return std::sqrt(a*a+b*b); };
-		float xr = SP(splat[i].r[0]*splat[i].r[2], splat[i].r[1]*splat[i].r[3]),
-			  yr = SP(splat[i].r[0]*splat[i].r[3], splat[i].r[1]*splat[i].r[2]);
-
-		xr *= 2.2;
-		yr *= 2.2;
-
-		int Xmin = std::max(xmin, (int) std::floor(splat[i].x-xr)),
-			Xmax = std::min(xmax, (int) std::ceil(splat[i].x+xr)),
-			Ymin = std::max(ymin, (int) std::floor(splat[i].y-yr)),
-			Ymax = std::min(ymax, (int) std::ceil(splat[i].y+yr));
+		Xmin = std::max(xmin, Xmin);
+		Ymin = std::max(ymin, Ymin);
+		Xmax = std::min(xmax, Xmax);
+		Ymax = std::min(ymax, Ymax);
 
 		for(int y=Ymin; y<Ymax; ++y){
 			for(int x=Xmin; x<Xmax; ++x){
@@ -33,18 +50,23 @@ void _paint(int xmin, int ymin, int xmax, int ymax){
 	}
 }
 
-void paint(){
-	for(int i=0; i<width*height*3; ++i) canvas[i] = 1.0;
-	
-	int nthreads = 10;
-	std::thread threads[nthreads-1];
+void paint(int xmin, int ymin, int xmax, int ymax){
+	std::thread threads[THREADS-1];
 
-	for(int i=1; i<nthreads; ++i)
-		threads[i-1] = std::thread(_paint, 0, height*(i-1)/nthreads, width, height*i/nthreads);
+	for(int i=1; i<THREADS; ++i)
+		threads[i-1] = std::thread(_paint,
+			xmin + ((xmax-xmin)*(i-1))/THREADS, ymin,
+			xmin + ((xmax-xmin)*i)/THREADS, ymax);
 
-	_paint(0, height*(nthreads-1)/nthreads, width, height);
+	_paint(xmin + ((xmax-xmin)*(THREADS-1))/THREADS, ymin, xmax, ymax);
 	
-	for(int i=1; i<nthreads; ++i) threads[i-1].join();
+	for(int i=1; i<THREADS; ++i) threads[i-1].join();
+}
+
+void paint(_splat &s){
+	int xmin, ymin, xmax, ymax;
+	bbox(s, xmin, ymin, xmax, ymax);
+	paint(xmin, ymin, xmax, ymax);
 }
 
 void write(const char *filename){

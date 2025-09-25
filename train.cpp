@@ -1,11 +1,14 @@
 // HYPER
 
 const int RECORD = 1;
-const int DEFAULT_SPLATS = 4096;
-const int DEFAULT_PARTICLES = 32;
+const int DEFAULT_SPLATS = 512;
 
 const float IMP_TUNE = 2.0;
 const int IMP_RAD = 10;
+
+const int MAX_ITER = 8000e3;
+
+#define THREADS 10
 
 // DFL
 
@@ -146,17 +149,49 @@ void load_reference(const char *filename){
 
 // LOSS IMPL
 
-float loss(){
-	paint();
-
+void _loss(float *r, int xmin, int ymin, int xmax, int ymax){
 	long long ret = 0;
+	double imp_total = 0.0;
 
-	for(int i=0; i<width*height*3; ++i){
-		int diff = (int) c1::data[i] - std::max(0, std::min(255, (int) std::floor(255.0 * canvas[i])));
-		ret += diff*diff * c1::imp[i];
+	for(int y=ymin; y<ymax; ++y){
+		for(int x=xmin; x<xmax; ++x){
+			for(int z=0; z<3; ++z){
+				int i = 3*(x+y*width)+z;
+				int diff = (int) c1::data[i] - std::max(0, std::min(255, (int) std::floor(255.0 * canvas[i])));
+				ret += diff*diff * c1::imp[i];
+				imp_total += c1::imp[i];
+			}
+		}
 	}
 
-	return (float) ret/c1::imp_total;
+	*r = (float) ret/imp_total;
+}
+
+float loss(int xmin, int ymin, int xmax, int ymax){
+	std::thread threads[THREADS-1];
+
+	float _ret[THREADS];
+
+	for(int i=1; i<THREADS; ++i)
+		threads[i-1] = std::thread(_loss, _ret+i,
+			xmin + ((xmax-xmin)*(i-1))/THREADS, ymin,
+			xmin + ((xmax-xmin)*i)/THREADS, ymax);
+
+	_loss(_ret, xmin + ((xmax-xmin)*(THREADS-1))/THREADS, ymin, xmax, ymax);
+
+	for(int i=1; i<THREADS; ++i) threads[i-1].join();
+
+	float ret = 0.0;
+
+	for(int i=0; i<THREADS; ++i) ret += _ret[i];
+
+	return ret / THREADS;
+}
+
+float loss(_splat &s){
+	int xmin, ymin, xmax, ymax;
+	bbox(s, xmin, ymin, xmax, ymax);
+	return loss(xmin, ymin, xmax, ymax);
 }
 
 // MAIN
@@ -170,7 +205,8 @@ int main(){
 
 	if(E) init_state();
 
-	float error = loss();
+	paint(0, 0, width, height);
+	float error = loss(0, 0, width, height);
 
 	signal(SIGINT, sighandler);
 
@@ -254,10 +290,15 @@ int main(){
 			for(int z=0; z<4; ++z) if(C == 5+z) M(splat[i].c[z], 1.0);
 		}
 
-		int reject = 0;
-		float new_error = loss();
-		if(new_error > error) splat[i] = old, hist::tick(T, 0), reject = 1;
-		else hist::tick(T, error-new_error), error = new_error;
+		paint(old), paint(splat[i]);
+		float new_error = loss(0, 0, width, height);
+
+		if(new_error > error){
+			splat[i].c[3] = 0.0, paint(splat[i]);
+			splat[i] = old, paint(old);
+			hist::tick(T, 0);
+
+		}else hist::tick(T, error-new_error), error = new_error;
 
 		// END UPDATE
 
@@ -267,16 +308,16 @@ int main(){
 
 		if(iter%1000 == 0 && iter) std::cout << '\n';
 
-		if(a1 > 0.5){
+		if(a1 > 0.5 || iter%1000 == 0){
 			std::cout << '\r' << iter/1000 << "K  " << error << "E  ";
 			std::cout << hist::avg(0) << ' ' << hist::avg(1) << ' ' << hist::avg(2) << "A  ";
-			std::cout << (int) std::floor(a1/y2*1000) << "T  ";
+			std::cout << std::floor(a1/y2*100000)/1e2 << "T  ";
 			std::flush(std::cout);
 			a1 = 0, y2 = 0;
 		}
 
 		if(RECORD && iter%1000 == 0){
-			if(reject) paint(), reject = 0;
+			paint(0, 0, width, height);
 
 			{
 				std::string s = "frames/" + std::to_string(iter/1000) + ".bmp";
@@ -296,13 +337,13 @@ int main(){
 
 		if(a2 > 1) y = 1, a2 = 0;
 		if(y){
-			if(reject) paint(), reject = 0;
+			paint(0, 0, width, height);
 			write("progress.bmp"), y = 0;
 		}
 
 		// AUTO PARAMETERIZE
 		{
-			if(iter == 1600e3) break;
+			if(iter == MAX_ITER) break;
 		};
 
 		++iter;

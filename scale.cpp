@@ -1,3 +1,5 @@
+#define THREADS 10
+
 #include <iostream>
 #include <random>
 #include <thread>
@@ -27,7 +29,7 @@ int main(int argc, const char **argv){
 
 	if(argc >= 5){
 		int _S = std::stoi(argv[4]);
-		float S = S/1e2;
+		float S = _S/1e2;
 		
 		for(int i=0; i<n; ++i){
 			if(_S == -1){
@@ -52,7 +54,7 @@ int main(int argc, const char **argv){
 
 	auto start = std::chrono::high_resolution_clock::now();
 
-	paint();
+	paint(0, 0, width, height);
 
 	auto now = std::chrono::high_resolution_clock::now();
 	float duration = ((std::chrono::duration<float>) (now-start)).count();

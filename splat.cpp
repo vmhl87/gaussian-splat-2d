@@ -11,7 +11,7 @@ struct _splat{
 
 // signature
 
-float loss();
+float loss(int xmin, int ymin, int xmax, int ymax);
 void paint();
 
 void init_state();

@@ -3,5 +3,7 @@ run
 frames/*.bmp
 frames/*.stat
 frames/*.conf
+frames/data.csv
+frames/timelapse.mp4
 prep-reference-image/*.bmp
 prep-reference-image/*.jpg
