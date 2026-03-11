@@ -8,4 +8,4 @@ Reference image and best trained result:
 
 Training timelapse:
 
-![timelapse](archive/v2/timelapse.mp4)
+![timelapse](archive/v2/timelapse.gif)
