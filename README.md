@@ -8,4 +8,4 @@ Reference image and best trained result:
 
 Training timelapse:
 
-[![Watch the video](https://github.com/vmhl87/gaussian-splat-2d/raw/refs/heads/master/archive/v2/timelapse.mp4)](https://github.com/vmhl87/gaussian-splat-2d/raw/refs/heads/master/archive/v2/timelapse.mp4)
+![timelapse](archive/v2/timelapse.mp4)
